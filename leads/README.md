@@ -21,7 +21,7 @@ cp .env.example .env        # preencha as chaves (passo a passo abaixo)
 # Pelo terminal: busca e já manda para o Telegram
 node buscar.js --termo hamburgueria --cidade "Feira de Santana" --uf BA
 
-# Ou pela tela: http://localhost:3000 (botão "Enviar pro Telegram")
+# Ou pela tela: http://localhost:3000 (botão "Buscar e enviar")
 npm start
 ```
 
@@ -83,9 +83,9 @@ e ter contato direto.
 
 ## Na tela
 
-Filtros, status do funil (Novo → Contatado → Em negociação → Fechado), anotações
-(salvas no navegador), botão de WhatsApp com mensagem de abordagem pronta (para
-celulares), download do CSV e envio para o Telegram.
+Tela simples: cidade, UF, o que procurar e o botão **Buscar e enviar**. Ela busca, mostra a
+lista resumida (score, motivos e links de WhatsApp, Instagram e Maps) e manda tudo para o
+Telegram. Para detalhes e planilha, veja a mensagem no Telegram.
 
 ## API
 

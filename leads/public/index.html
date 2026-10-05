@@ -6,342 +6,128 @@
   <title>Busca de Leads — Vitrine Delivery</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet" />
   <style>
     :root {
       --bg: #0d0b1e;
-      --bg-soft: #16132e;
       --card: #1c1838;
       --border: rgba(255, 255, 255, 0.08);
       --text: #f4f2ff;
       --muted: #a9a4c9;
       --brand: #ff6b35;
       --brand-2: #ffb347;
-      --accent: #7c5cff;
-      --green: #2ecc71;
-      --red: #ff4d6d;
-      --radius: 14px;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
     a { color: var(--brand-2); }
-    .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
-    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
-    h1 { font-size: 1.5rem; }
-    h1 span { background: linear-gradient(90deg, var(--brand), var(--brand-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .sub { color: var(--muted); font-size: .92rem; }
-
-    form.search { background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: grid; gap: 12px;
-      grid-template-columns: 2fr 80px 2fr auto; align-items: end; }
-    label { display: grid; gap: 4px; font-size: .8rem; color: var(--muted); font-weight: 600; }
-    input, select, textarea { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; width: 100%; }
-    input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
-    .opts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; font-size: .88rem; color: var(--muted); }
-    .opts label { display: flex; align-items: center; gap: 6px; font-weight: 500; font-size: .88rem; }
-    .opts input[type=checkbox] { width: auto; accent-color: var(--brand); }
-    .opts input[type=number] { width: 70px; padding: 6px 8px; }
-    button { font: inherit; font-weight: 700; border: 0; border-radius: 10px; padding: 11px 18px; cursor: pointer; color: #fff;
+    .wrap { max-width: 640px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { font-size: 1.4rem; margin-bottom: 4px; }
+    h1 span { color: var(--brand); }
+    .sub { color: var(--muted); font-size: .9rem; margin-bottom: 20px; }
+    form { display: grid; grid-template-columns: 1fr 72px; gap: 10px; }
+    input { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px; width: 100%; }
+    input:focus { outline: 2px solid var(--brand); border-color: transparent; }
+    .full { grid-column: 1 / -1; }
+    button { font: inherit; font-weight: 800; border: 0; border-radius: 10px; padding: 12px; cursor: pointer; color: #fff;
       background: linear-gradient(90deg, var(--brand), var(--brand-2)); }
-    button.ghost { background: var(--card); border: 1px solid var(--border); color: var(--text); font-weight: 600; }
     button:disabled { opacity: .6; cursor: progress; }
-
-    .status { margin: 16px 0; font-size: .9rem; color: var(--muted); min-height: 1.4em; }
-    .error { background: rgba(255, 77, 109, .1); border: 1px solid rgba(255, 77, 109, .4); color: #ffb3c1; padding: 10px 12px; border-radius: 10px; margin: 8px 0; font-size: .88rem; }
-
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
-    .stat { background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
-    .stat b { display: block; font-size: 1.5rem; }
-    .stat small { color: var(--muted); }
-
-    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
-    .toolbar input, .toolbar select { width: auto; flex: 1 1 180px; }
-
-    .list { display: grid; gap: 12px; }
-    .lead { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: grid; grid-template-columns: 64px 1fr 220px; gap: 16px; }
-    .score { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 1.2rem;
-      background: conic-gradient(var(--c) calc(var(--p) * 1%), rgba(255,255,255,.06) 0); position: relative; }
-    .score::after { content: ''; position: absolute; inset: 6px; border-radius: 50%; background: var(--card); }
-    .score span { position: relative; z-index: 1; }
-    .lead h3 { font-size: 1.05rem; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .meta { color: var(--muted); font-size: .85rem; margin: 2px 0 8px; }
-    .badge { font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; color: #fff; text-decoration: none; }
-    .badge.maps { background: #1a73e8; }
-    .badge.ig { background: linear-gradient(90deg, #f58529, #dd2a7b, #8134af); }
-    .badge.site { background: var(--accent); }
-    .bio { font-size: .82rem; color: var(--muted); font-style: italic; margin-bottom: 8px; }
-    .notice { background: rgba(255, 179, 71, .1); border: 1px solid rgba(255, 179, 71, .4); color: #ffd9a3; padding: 10px 12px; border-radius: 10px; margin: 8px 0 16px; font-size: .88rem; }
-    .notice code { background: rgba(0,0,0,.3); padding: 1px 5px; border-radius: 4px; }
-    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-    .chip { font-size: .75rem; padding: 3px 9px; border-radius: 99px; background: rgba(124, 92, 255, .15); color: #cfc3ff; }
-    .side { display: grid; gap: 8px; align-content: start; }
-    .side textarea { min-height: 54px; font-size: .82rem; resize: vertical; }
-    .side .actions { display: flex; gap: 8px; }
-    .side .actions a { flex: 1; text-align: center; font-size: .82rem; font-weight: 700; padding: 8px; border-radius: 10px; text-decoration: none; }
-    .wa { background: var(--green); color: #062b14; }
-    .copy { background: var(--bg-soft); border: 1px solid var(--border); color: var(--text) !important; cursor: pointer; }
-    .empty { text-align: center; color: var(--muted); padding: 48px 16px; border: 1px dashed var(--border); border-radius: var(--radius); }
-
-    @media (max-width: 860px) {
-      form.search { grid-template-columns: 1fr 80px; }
-      form.search .term { grid-column: 1 / -1; }
-      form.search button { grid-column: 1 / -1; }
-      .stats { grid-template-columns: repeat(2, 1fr); }
-      .lead { grid-template-columns: 56px 1fr; }
-      .score { width: 56px; height: 56px; }
-      .side { grid-column: 1 / -1; }
-    }
+    .demo { font-size: .85rem; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+    .demo input { width: auto; accent-color: var(--brand); }
+    .msg { margin: 16px 0; font-size: .9rem; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); }
+    .msg:empty { display: none; }
+    .msg.ok { background: rgba(46, 204, 113, .1); border-color: rgba(46, 204, 113, .4); }
+    .msg.warn { background: rgba(255, 179, 71, .1); border-color: rgba(255, 179, 71, .4); color: #ffd9a3; }
+    .msg.err { background: rgba(255, 77, 109, .1); border-color: rgba(255, 77, 109, .4); color: #ffb3c1; }
+    ol { list-style: none; display: grid; gap: 8px; }
+    li { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; gap: 12px; align-items: center; }
+    li b.s { min-width: 34px; font-size: 1.1rem; }
+    li .n { flex: 1; min-width: 0; }
+    li .n small { display: block; color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
+    li .l { display: flex; gap: 12px; font-size: .82rem; flex-wrap: wrap; margin-top: 2px; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <header>
-      <div>
-        <h1>Busca de Leads <span>Vitrine Delivery</span></h1>
-        <p class="sub">Encontra restaurantes no Google Maps, cruza com o Instagram e manda os melhores leads para o seu Telegram.</p>
-      </div>
-    </header>
+    <h1>Busca de Leads <span>Vitrine Delivery</span></h1>
+    <p class="sub">Google Maps + Instagram → seu Telegram.</p>
 
-    <div id="setup"></div>
-
-    <form class="search" id="form">
-      <label>Cidade <input name="city" value="Feira de Santana" required /></label>
-      <label>UF <input name="uf" value="BA" maxlength="2" required /></label>
-      <label class="term">O que procurar <input name="term" placeholder="hamburgueria, pizzaria, açaí…" /></label>
-      <button type="submit" id="btn">Buscar leads</button>
-      <div class="opts">
-        <label title="Procura o @ de cada loja e, com token, lê seguidores e posts"><input type="checkbox" name="instagram" checked /> Buscar Instagram</label>
-        <label>Score mínimo <input type="number" name="minScore" value="0" min="0" max="100" /></label>
-        <label title="Envia automaticamente ao terminar a busca"><input type="checkbox" name="autoSend" /> Enviar pro Telegram ao terminar</label>
-        <label title="Usa dados fictícios, sem chaves de API"><input type="checkbox" name="demo" /> Modo demonstração</label>
-      </div>
+    <form id="form">
+      <input name="city" value="Feira de Santana" placeholder="Cidade" required aria-label="Cidade" />
+      <input name="uf" value="BA" maxlength="2" placeholder="UF" required aria-label="UF" />
+      <input class="full" name="term" placeholder="O que procurar (hamburgueria, pizzaria…)" aria-label="O que procurar" />
+      <button class="full" id="btn" type="submit">Buscar e enviar</button>
+      <label class="demo full"><input type="checkbox" name="demo" /> Modo demonstração (dados fictícios)</label>
     </form>
 
-    <div class="status" id="status"></div>
-    <div id="errors"></div>
-
-    <section id="results" hidden>
-      <div class="stats" id="stats"></div>
-      <div class="toolbar">
-        <input id="filter" placeholder="Filtrar por nome, categoria ou motivo…" />
-        <select id="statusFilter">
-          <option value="">Todos os status</option>
-        </select>
-        <select id="igFilter">
-          <option value="">Com e sem Instagram</option>
-          <option value="yes">Com Instagram</option>
-          <option value="no">Sem Instagram</option>
-        </select>
-        <button id="sendBtn" type="button">Enviar pro Telegram</button>
-        <button class="ghost" id="exportBtn" type="button">Baixar CSV</button>
-      </div>
-      <div class="list" id="list"></div>
-    </section>
+    <div class="msg" id="msg"></div>
+    <ol id="list"></ol>
   </div>
 
   <script>
-    const STATUSES = ['Novo', 'Contatado', 'Em negociação', 'Fechado', 'Descartado'];
-    const STORE_KEY = 'vd-leads-crm';
-    const DAY = 864e5;
-
-    let leads = [];
-    let lastQuery = null;
-    let crm = loadCrm();
-
-    function loadCrm() {
-      try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; }
-    }
-    function saveCrm() {
-      try { localStorage.setItem(STORE_KEY, JSON.stringify(crm)); } catch { /* armazenamento indisponível */ }
-    }
-    const keyOf = (l) => l.id || l.name.toLowerCase();
-    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const $ = (id) => document.getElementById(id);
-    for (const s of STATUSES) $('statusFilter').insertAdjacentHTML('beforeend', `<option>${s}</option>`);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    let status = {};
 
-    function phoneDigits(p) {
-      let d = String(p || '').replace(/\D/g, '').replace(/^0+/, '');
-      if (!d) return null;
-      if (!d.startsWith('55')) d = '55' + d;
-      return d.length >= 12 && d.length <= 13 ? d : null;
+    function show(html, kind) {
+      $('msg').className = `msg ${kind || ''}`;
+      $('msg').innerHTML = html;
     }
+
     function whatsapp(l) {
       if (l.whatsapp) return l.whatsapp;
-      const d = phoneDigits(l.phone);
-      return d && d.length === 13 && d[4] === '9' ? d : null;
-    }
-    const daysSince = (iso) => (iso ? Math.floor((Date.now() - new Date(iso)) / DAY) : null);
-
-    function pitch(l) {
-      const motivo = l.reasons.filter((r) => r !== 'Nicho foco' && r !== 'Tem contato direto').slice(0, 2).join(' e ').toLowerCase();
-      return `Olá, ${l.name}! Tudo bem? Sou da Vitrine Delivery, aqui de ${lastQuery?.city || 'Feira de Santana'}. ` +
-        `Dei uma olhada no perfil de vocês no Google${l.instagram ? ' e no Instagram' : ''}` +
-        (motivo ? ` e vi algumas oportunidades (${motivo})` : '') +
-        `. Ajudamos deliveries a vender mais com fotos, cardápio e Instagram otimizados. Posso te mandar uma amostra gratuita?`;
+      let d = String(l.phone || '').replace(/\D/g, '').replace(/^0+/, '');
+      if (d && !d.startsWith('55')) d = '55' + d;
+      return d.length === 13 && d[4] === '9' ? d : null;
     }
 
-    const scoreColor = (s) => (s >= 60 ? 'var(--green)' : s >= 35 ? 'var(--brand-2)' : 'var(--muted)');
-
-    function render() {
-      const text = $('filter').value.toLowerCase();
-      const st = $('statusFilter').value;
-      const ig = $('igFilter').value;
-      const shown = leads.filter((l) => {
-        const c = crm[keyOf(l)] || {};
-        if (st && (c.status || 'Novo') !== st) return false;
-        if (ig === 'yes' && !l.instagram) return false;
-        if (ig === 'no' && l.instagram) return false;
-        if (text && !`${l.name} ${l.category} ${l.reasons.join(' ')}`.toLowerCase().includes(text)) return false;
-        return true;
-      });
-
-      $('list').innerHTML = shown.length ? shown.map((l, i) => {
-        const k = keyOf(l);
-        const c = crm[k] || {};
+    function renderList(leads) {
+      $('list').innerHTML = leads.map((l) => {
         const wa = whatsapp(l);
-        const badges = [
-          l.mapsUrl && `<a class="badge maps" href="${esc(l.mapsUrl)}" target="_blank" rel="noopener">Google Maps ↗</a>`,
-          l.instagram && `<a class="badge ig" href="${esc(l.instagram.url)}" target="_blank" rel="noopener">@${esc(l.instagram.username)} ↗</a>`,
-          l.website && !/instagram\.com/i.test(l.website) && `<a class="badge site" href="${esc(l.website)}" target="_blank" rel="noopener">Site ↗</a>`,
+        const links = [
+          wa && `<a href="https://wa.me/${wa}" target="_blank" rel="noopener">WhatsApp</a>`,
+          l.instagram && `<a href="${esc(l.instagram.url)}" target="_blank" rel="noopener">@${esc(l.instagram.username)}</a>`,
+          l.mapsUrl && `<a href="${esc(l.mapsUrl)}" target="_blank" rel="noopener">Maps</a>`,
         ].filter(Boolean).join('');
-        const d = daysSince(l.instagram?.lastPostAt);
-        const meta = [
-          l.category,
-          l.rating ? `★ ${l.rating.toFixed(1)} (${l.reviewCount ?? 0})` : 'sem nota',
-          l.photoCount != null ? `${l.photoCount} fotos` : null,
-          l.instagram?.followers != null ? `${l.instagram.followers} seguidores` : null,
-          d != null ? `último post há ${d}d` : null,
-          l.phone ? `☎ ${l.phone}` : null,
-          l.address,
-        ].filter(Boolean).map(esc).join(' · ');
-        return `
-          <article class="lead">
-            <div class="score" style="--p:${l.score};--c:${scoreColor(l.score)}" title="Score de oportunidade"><span>${l.score}</span></div>
-            <div>
-              <h3>${esc(l.name)} ${badges}</h3>
-              <p class="meta">${meta}</p>
-              ${l.instagram?.bio ? `<p class="bio">“${esc(l.instagram.bio)}”</p>` : ''}
-              <div class="chips">${l.reasons.map((r) => `<span class="chip">${esc(r)}</span>`).join('')}</div>
-            </div>
-            <div class="side">
-              <select data-k="${esc(k)}" data-f="status">${STATUSES.map((s) => `<option ${s === (c.status || 'Novo') ? 'selected' : ''}>${s}</option>`).join('')}</select>
-              <textarea data-k="${esc(k)}" data-f="note" placeholder="Anotações…">${esc(c.note)}</textarea>
-              <div class="actions">
-                ${wa ? `<a class="wa" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${encodeURIComponent(pitch(l))}">WhatsApp</a>` : ''}
-                <a class="copy" data-copy="${i}">Copiar abordagem</a>
-              </div>
-            </div>
-          </article>`;
-      }).join('') : '<div class="empty">Nenhum lead com esses filtros.</div>';
-
-      $('list').querySelectorAll('[data-copy]').forEach((el) => {
-        el.onclick = async () => {
-          try { await navigator.clipboard.writeText(pitch(shown[el.dataset.copy])); el.textContent = 'Copiado!'; }
-          catch { el.textContent = 'Não foi possível copiar'; }
-          setTimeout(() => (el.textContent = 'Copiar abordagem'), 1500);
-        };
-      });
+        return `<li><b class="s">${l.score}</b><span class="n">${esc(l.name)}<small>${esc(l.reasons.slice(0, 3).join(' · '))}</small><span class="l">${links}</span></span></li>`;
+      }).join('');
     }
-
-    $('list').addEventListener('change', (e) => {
-      const { k, f } = e.target.dataset;
-      if (!k) return;
-      crm[k] = { ...(crm[k] || {}), [f]: e.target.value };
-      saveCrm();
-    });
-    ['filter', 'statusFilter', 'igFilter'].forEach((id) => $(id).addEventListener('input', render));
-
-    function renderStats() {
-      $('stats').innerHTML = [
-        [leads.length, 'lojas encontradas'],
-        [leads.filter((l) => l.score >= 60).length, 'leads quentes (score ≥ 60)'],
-        [leads.filter((l) => l.instagram).length, 'com Instagram'],
-        [leads.filter((l) => whatsapp(l)).length, 'com WhatsApp'],
-      ].map(([n, t]) => `<div class="stat"><b>${n}</b><small>${t}</small></div>`).join('');
-    }
-
-    function showErrors(list) {
-      $('errors').innerHTML = list.map((m) => `<div class="error">${esc(m)}</div>`).join('');
-    }
-
-    async function sendToTelegram() {
-      $('sendBtn').disabled = true;
-      $('sendBtn').textContent = 'Enviando…';
-      try {
-        const res = await fetch('/api/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: lastQuery, leads }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Falha no envio');
-        $('sendBtn').textContent = 'Enviado ✓';
-      } catch (err) {
-        showErrors([err.message]);
-        $('sendBtn').textContent = 'Enviar pro Telegram';
-      } finally {
-        $('sendBtn').disabled = false;
-        setTimeout(() => ($('sendBtn').textContent = 'Enviar pro Telegram'), 2500);
-      }
-    }
-    $('sendBtn').addEventListener('click', sendToTelegram);
 
     $('form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const f = new FormData(e.target);
-      const params = new URLSearchParams({
-        city: f.get('city'), uf: f.get('uf'), term: f.get('term'),
-        minScore: f.get('minScore') || 0,
-        instagram: f.get('instagram') ? '1' : '0', demo: f.get('demo') ? '1' : '0',
-      });
+      const params = new URLSearchParams({ city: f.get('city'), uf: f.get('uf'), term: f.get('term'), demo: f.get('demo') ? '1' : '0' });
       $('btn').disabled = true;
-      $('status').textContent = 'Buscando no Google Maps e no Instagram… (pode levar até 1 minuto)';
-      showErrors([]);
+      $('list').innerHTML = '';
+      show('Buscando… (pode levar até 1 minuto)');
       try {
         const res = await fetch(`/api/search?${params}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Falha na busca');
-        leads = data.leads;
-        lastQuery = data.query;
-        $('errors').innerHTML = (data.warnings || []).map((w) => `<div class="notice">${esc(w)}</div>`).join('');
-        $('status').textContent = `${data.total} leads em ${data.query.city}/${data.query.uf}, ordenados por oportunidade.`;
-        $('results').hidden = false;
-        renderStats();
-        render();
-        if (f.get('autoSend') && leads.length) await sendToTelegram();
+        renderList(data.leads);
+
+        if (!data.leads.length) return show('Nenhum lead encontrado.', 'warn');
+        if (!status.telegram) {
+          return show(`${data.total} leads encontrados. Configure o Telegram no <code>.env</code> para recebê-los.`, 'warn');
+        }
+        show(`${data.total} leads encontrados. Enviando pro Telegram…`);
+        const sent = await fetch('/api/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: data.query, leads: data.leads }),
+        });
+        const out = await sent.json();
+        if (!sent.ok) throw new Error(out.error || 'Falha no envio');
+        show(`✓ ${data.total} leads enviados pro seu Telegram.`, 'ok');
       } catch (err) {
-        $('status').textContent = '';
-        showErrors([err.message]);
+        show(esc(err.message), 'err');
       } finally {
         $('btn').disabled = false;
       }
     });
 
-    $('exportBtn').addEventListener('click', () => {
-      const cols = ['score', 'nome', 'categoria', 'telefone', 'whatsapp', 'endereco', 'nota_google', 'avaliacoes', 'fotos', 'site', 'google_maps', 'instagram', 'seguidores', 'posts', 'dias_sem_postar', 'motivos', 'status', 'anotacoes'];
-      const rows = leads.map((l) => {
-        const c = crm[keyOf(l)] || {};
-        return [l.score, l.name, l.category, l.phone, whatsapp(l), l.address, l.rating, l.reviewCount, l.photoCount, l.website, l.mapsUrl,
-          l.instagram?.url, l.instagram?.followers, l.instagram?.posts, daysSince(l.instagram?.lastPostAt), l.reasons.join('; '), c.status || 'Novo', c.note];
-      });
-      const csv = [cols, ...rows].map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
-      a.download = `leads-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    });
-
-    // Mostra o que ainda falta configurar no .env.
     fetch('/api/status').then((r) => r.json()).then((s) => {
-      const missing = [
-        !s.google && '<b>GOOGLE_MAPS_API_KEY</b> (obrigatório para buscar)',
-        !s.telegram && '<b>TELEGRAM_BOT_TOKEN</b> e <b>TELEGRAM_CHAT_ID</b> (para receber os leads)',
-        !s.instagram && '<b>INSTAGRAM_USER_ID</b> e <b>INSTAGRAM_ACCESS_TOKEN</b> (opcional: seguidores e posts)',
-      ].filter(Boolean);
-      if (missing.length) {
-        $('setup').innerHTML = `<div class="notice">Falta configurar no arquivo <code>.env</code>: ${missing.join('; ')}. ` +
-          `Enquanto isso, use o <b>Modo demonstração</b>.</div>`;
-      }
+      status = s;
+      if (!s.google) show('Falta a <b>GOOGLE_MAPS_API_KEY</b> no <code>.env</code>. Enquanto isso, use o modo demonstração.', 'warn');
     }).catch(() => {});
   </script>
 </body>
