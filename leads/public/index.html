@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Busca de Leads — Vitrine Delivery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0d0b1e;
+      --card: #1c1838;
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f4f2ff;
+      --muted: #a9a4c9;
+      --brand: #ff6b35;
+      --brand-2: #ffb347;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+    a { color: var(--brand-2); }
+    .wrap { max-width: 640px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { font-size: 1.4rem; margin-bottom: 4px; }
+    h1 span { color: var(--brand); }
+    .sub { color: var(--muted); font-size: .9rem; margin-bottom: 20px; }
+    form { display: grid; grid-template-columns: 1fr 72px; gap: 10px; }
+    input { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px; width: 100%; }
+    input:focus { outline: 2px solid var(--brand); border-color: transparent; }
+    .full { grid-column: 1 / -1; }
+    button { font: inherit; font-weight: 800; border: 0; border-radius: 10px; padding: 12px; cursor: pointer; color: #fff;
+      background: linear-gradient(90deg, var(--brand), var(--brand-2)); }
+    button:disabled { opacity: .6; cursor: progress; }
+    .demo { font-size: .85rem; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+    .demo input { width: auto; accent-color: var(--brand); }
+    .msg { margin: 16px 0; font-size: .9rem; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); }
+    .msg:empty { display: none; }
+    .msg.ok { background: rgba(46, 204, 113, .1); border-color: rgba(46, 204, 113, .4); }
+    .msg.warn { background: rgba(255, 179, 71, .1); border-color: rgba(255, 179, 71, .4); color: #ffd9a3; }
+    .msg.err { background: rgba(255, 77, 109, .1); border-color: rgba(255, 77, 109, .4); color: #ffb3c1; }
+    ol { list-style: none; display: grid; gap: 8px; }
+    li { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; gap: 12px; align-items: center; }
+    li b.s { min-width: 34px; font-size: 1.1rem; }
+    li .n { flex: 1; min-width: 0; }
+    li .n small { display: block; color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
+    li .l { display: flex; gap: 12px; font-size: .82rem; flex-wrap: wrap; margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Busca de Leads <span>Vitrine Delivery</span></h1>
+    <p class="sub">Google Maps + Instagram → seu Telegram.</p>
+
+    <form id="form">
+      <input name="city" value="Feira de Santana" placeholder="Cidade" required aria-label="Cidade" />
+      <input name="uf" value="BA" maxlength="2" placeholder="UF" required aria-label="UF" />
+      <input class="full" name="term" placeholder="O que procurar (hamburgueria, pizzaria…)" aria-label="O que procurar" />
+      <button class="full" id="btn" type="submit">Buscar e enviar</button>
+      <label class="demo full"><input type="checkbox" name="demo" /> Modo demonstração (dados fictícios)</label>
+    </form>
+
+    <div class="msg" id="msg"></div>
+    <ol id="list"></ol>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    let status = {};
+
+    function show(html, kind) {
+      $('msg').className = `msg ${kind || ''}`;
+      $('msg').innerHTML = html;
+    }
+
+    function whatsapp(l) {
+      if (l.whatsapp) return l.whatsapp;
+      let d = String(l.phone || '').replace(/\D/g, '').replace(/^0+/, '');
+      if (d && !d.startsWith('55')) d = '55' + d;
+      return d.length === 13 && d[4] === '9' ? d : null;
+    }
+
+    function renderList(leads) {
+      $('list').innerHTML = leads.map((l) => {
+        const wa = whatsapp(l);
+        const links = [
+          wa && `<a href="https://wa.me/${wa}" target="_blank" rel="noopener">WhatsApp</a>`,
+          l.instagram && `<a href="${esc(l.instagram.url)}" target="_blank" rel="noopener">@${esc(l.instagram.username)}</a>`,
+          l.mapsUrl && `<a href="${esc(l.mapsUrl)}" target="_blank" rel="noopener">Maps</a>`,
+        ].filter(Boolean).join('');
+        return `<li><b class="s">${l.score}</b><span class="n">${esc(l.name)}<small>${esc(l.reasons.slice(0, 3).join(' · '))}</small><span class="l">${links}</span></span></li>`;
+      }).join('');
+    }
+
+    $('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      const params = new URLSearchParams({ city: f.get('city'), uf: f.get('uf'), term: f.get('term'), demo: f.get('demo') ? '1' : '0' });
+      $('btn').disabled = true;
+      $('list').innerHTML = '';
+      show('Buscando… (pode levar até 1 minuto)');
+      try {
+        const res = await fetch(`/api/search?${params}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Falha na busca');
+        renderList(data.leads);
+
+        if (!data.leads.length) return show('Nenhum lead encontrado.', 'warn');
+        if (!status.telegram) {
+          return show(`${data.total} leads encontrados. Configure o Telegram no <code>.env</code> para recebê-los.`, 'warn');
+        }
+        show(`${data.total} leads encontrados. Enviando pro Telegram…`);
+        const sent = await fetch('/api/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: data.query, leads: data.leads }),
+        });
+        const out = await sent.json();
+        if (!sent.ok) throw new Error(out.error || 'Falha no envio');
+        show(`✓ ${data.total} leads enviados pro seu Telegram.`, 'ok');
+      } catch (err) {
+        show(esc(err.message), 'err');
+      } finally {
+        $('btn').disabled = false;
+      }
+    });
+
+    fetch('/api/status').then((r) => r.json()).then((s) => {
+      status = s;
+      if (!s.google) show('Falta a <b>GOOGLE_MAPS_API_KEY</b> no <code>.env</code>. Enquanto isso, use o modo demonstração.', 'warn');
+    }).catch(() => {});
+  </script>
+</body>
+</html>
