@@ -30,3 +30,8 @@ python3 -m http.server 8000
 - Substituir o número de WhatsApp placeholder (`5575000000000`) pelo número real.
 - Trocar os projetos-modelo do portfólio por cases reais conforme forem fechados.
 - Adicionar logo/identidade visual definitiva.
+
+## Busca de leads (iFood + Delivery Much)
+
+A pasta [`leads/`](leads/) tem uma ferramenta para encontrar e priorizar restaurantes
+nessas plataformas. Veja [`leads/README.md`](leads/README.md). Para rodar: `cd leads && npm start`.
