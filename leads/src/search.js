@@ -1,36 +1,31 @@
 'use strict';
 
-const { geocode } = require('./geocode');
-const { scoreLead, mergeAcrossPlatforms } = require('./scoring');
-const ifood = require('./providers/ifood');
-const deliverymuch = require('./providers/deliverymuch');
+const { mapLimit } = require('./http');
+const { config } = require('./config');
+const { scoreLead } = require('./scoring');
+const googlemaps = require('./providers/googlemaps');
+const instagram = require('./providers/instagram');
 const demo = require('./providers/demo');
 
-const PROVIDERS = { ifood, deliverymuch };
+async function searchLeads({ city, uf, term, demo: useDemo = false, withInstagram = true, minScore = 0, maxResults = 60 }) {
+  const warnings = [];
+  let leads = useDemo
+    ? await demo.search({ city, uf, term })
+    : await googlemaps.search({ city, uf, term, maxResults });
 
-async function searchLeads({ city, uf, term, sources = ['ifood', 'deliverymuch'], demo: useDemo = false, enrich = true, minScore = 0 }) {
-  const loc = await geocode(city, uf);
-  const errors = {};
+  if (withInstagram && !useDemo) {
+    await mapLimit(leads, 5, (lead) => instagram.enrich(lead));
+    if (!config.igToken) {
+      warnings.push('Instagram sem token: só o @ é coletado (sem seguidores/posts). Veja o README para configurar.');
+    }
+  }
 
-  const results = await Promise.all(
-    sources.map(async (source) => {
-      try {
-        if (useDemo) return await demo.search(loc, { term, platform: source });
-        if (!PROVIDERS[source]) throw new Error('Plataforma desconhecida');
-        return await PROVIDERS[source].search(loc, { term, enrich });
-      } catch (err) {
-        errors[source] = err.message;
-        return [];
-      }
-    }),
-  );
-
-  const leads = mergeAcrossPlatforms(results.flat())
-    .map(scoreLead)
+  leads = leads
+    .map((l) => scoreLead(l))
     .filter((l) => l.score >= minScore)
     .sort((a, b) => b.score - a.score);
 
-  return { location: loc, total: leads.length, leads, errors };
+  return { query: { city, uf, term: term || null }, total: leads.length, leads, warnings };
 }
 
-module.exports = { searchLeads, PROVIDERS };
+module.exports = { searchLeads };

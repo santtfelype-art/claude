@@ -18,6 +18,7 @@ async function request(url, { method = 'GET', headers = {}, body, timeoutMs = 15
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const host = new URL(url).host;
   try {
     const res = await fetch(url, {
       method,
@@ -30,12 +31,22 @@ async function request(url, { method = 'GET', headers = {}, body, timeoutMs = 15
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status} em ${new URL(url).host}`);
+    if (!res.ok) {
+      // APIs do Google/Meta explicam o erro no corpo; repassamos a mensagem.
+      let detail = '';
+      try {
+        const j = JSON.parse(await res.text());
+        detail = j.error?.message || j.message || '';
+      } catch {
+        /* corpo não é JSON */
+      }
+      throw new Error(`HTTP ${res.status} em ${host}${detail ? `: ${detail}` : ''}`);
+    }
     const value = as === 'json' ? await res.json() : await res.text();
     cache.set(key, { value, expires: Date.now() + CACHE_TTL_MS });
     return value;
   } catch (err) {
-    if (err.name === 'AbortError') throw new Error(`Tempo esgotado em ${new URL(url).host}`);
+    if (err.name === 'AbortError') throw new Error(`Tempo esgotado em ${host}`);
     throw err;
   } finally {
     clearTimeout(timer);

@@ -2,110 +2,140 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
+const http = require('http');
 
-const ifood = require('../src/providers/ifood');
-const deliverymuch = require('../src/providers/deliverymuch');
-const { extractMerchants, extractJsonFromHtml } = require('../src/providers/extract');
-const { makeLead } = require('../src/lead');
-const { scoreLead, mergeAcrossPlatforms } = require('../src/scoring');
+const googlemaps = require('../src/providers/googlemaps');
+const instagram = require('../src/providers/instagram');
+const { makeLead, phoneDigits } = require('../src/lead');
+const { scoreLead } = require('../src/scoring');
+const { toCsv, formatMessages, whatsappNumber } = require('../src/report');
 const { searchLeads } = require('../src/search');
-const { server } = require('../server');
 
-const LOC = { lat: -12.2664, lng: -38.9663, city: 'Feira de Santana', uf: 'BA' };
+// Servidor HTTP local para simular APIs externas.
+async function fakeServer(handler) {
+  const srv = http.createServer(handler);
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  return { srv, base: `http://127.0.0.1:${srv.address().port}` };
+}
 
-test('iFood: normaliza loja da listagem v1', () => {
-  const lead = ifood.toLead(
-    {
-      id: 'abc-123',
-      name: 'Burger do Bairro',
-      slug: 'burger-do-bairro-centro',
-      userRating: 4.2,
-      mainCategory: { friendlyName: 'Lanches' },
-      deliveryFee: { value: 5.99 },
-      deliveryTime: 40,
-      distance: 2.1,
-      available: true,
-      resources: [{ type: 'LOGO', fileName: 'x.png' }],
-    },
-    LOC,
-  );
+test('Google Maps: normaliza lugar da Places API', () => {
+  const lead = googlemaps.toLead({
+    id: 'ChIJ123',
+    displayName: { text: 'Burger do Bairro' },
+    formattedAddress: 'Rua A, 10 - Centro, Feira de Santana - BA',
+    nationalPhoneNumber: '(75) 99100-0001',
+    websiteUri: 'https://www.instagram.com/burgerdobairro/',
+    rating: 4.1,
+    userRatingCount: 22,
+    googleMapsUri: 'https://maps.google.com/?cid=1',
+    primaryTypeDisplayName: { text: 'Hamburgueria' },
+    businessStatus: 'OPERATIONAL',
+    photos: [{}, {}],
+  });
   assert.equal(lead.name, 'Burger do Bairro');
-  assert.equal(lead.category, 'Lanches');
-  assert.equal(lead.rating, 4.2);
-  assert.equal(lead.deliveryFee, 5.99);
-  assert.equal(lead.hasLogo, true);
-  assert.equal(lead.url, 'https://www.ifood.com.br/delivery/feira-de-santana-ba/burger-do-bairro-centro/abc-123');
+  assert.equal(lead.category, 'Hamburgueria');
+  assert.equal(lead.photoCount, 2);
+  assert.equal(lead.reviewCount, 22);
+  assert.equal(lead.mapsUrl, 'https://maps.google.com/?cid=1');
 });
 
-test('iFood: extrai lojas de cards da busca (cardstack)', () => {
-  const payload = {
-    sections: [{ cards: [{ cardType: 'MERCHANT_LIST', data: { contents: [
-      { id: 'm1', name: 'Pizza X', userRating: 4.8, action: 'merchant?identifier=m1&slug=feira-de-santana-ba%2Fpizza-x', imageUrl: 'logo.png' },
-      { id: 'i1', name: 'Pizza Calabresa', price: 39.9, description: 'item de cardápio' },
-    ] } }] }],
-  };
-  const merchants = extractMerchants(payload);
-  assert.equal(merchants.length, 1);
-  const lead = ifood.toLead(merchants[0], LOC);
-  assert.equal(lead.url, 'https://www.ifood.com.br/delivery/feira-de-santana-ba/pizza-x/m1');
+test('Instagram: extrai @ de URLs e ignora caminhos reservados', () => {
+  assert.equal(instagram.handleFromUrl('https://www.instagram.com/Burger.Do.Bairro/?hl=pt'), 'burger.do.bairro');
+  assert.equal(instagram.handleFromUrl('https://instagram.com/p/AbC123'), null);
+  assert.equal(instagram.handleFromUrl('https://burger.com.br'), null);
+  assert.equal(instagram.whatsappFromText('Peça: https://wa.me/5575991000001'), '5575991000001');
+  assert.equal(instagram.whatsappFromText('api.whatsapp.com/send?phone=75991000001'), '5575991000001');
 });
 
-test('Delivery Much: extrai lojas de JSON-LD e __NEXT_DATA__', () => {
-  const html = `
-    <script type="application/ld+json">{"@type":"Restaurant","name":"Açaí Tropical","telephone":"(75) 99999-0000",
-      "aggregateRating":{"ratingValue":"4.5","reviewCount":"120"},"servesCuisine":["Açaí"]}</script>
-    <script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"companies":[
-      {"id":7,"name":"Espetinho do Zé","slug":"espetinho-do-ze","delivery_fee":4,"logo":null,"rating":3.9}
-    ]}}}</script>`;
-  const merchants = extractJsonFromHtml(html).flatMap(extractMerchants);
-  const leads = merchants.map((m) => deliverymuch.toLead(m, LOC, 'https://www.deliverymuch.com.br/feira-de-santana-ba'));
-  const acai = leads.find((l) => l.name === 'Açaí Tropical');
-  const espeto = leads.find((l) => l.name === 'Espetinho do Zé');
-  assert.equal(acai.phone, '(75) 99999-0000');
-  assert.equal(acai.rating, 4.5);
-  assert.equal(acai.category, 'Açaí');
-  assert.equal(espeto.url, 'https://www.deliverymuch.com.br/feira-de-santana-ba/espetinho-do-ze');
-  assert.equal(espeto.hasLogo, false);
+test('Instagram: encontra @ e WhatsApp dentro do site da loja', async () => {
+  const { srv, base } = await fakeServer((req, res) => {
+    res.end('<a href="https://www.instagram.com/pizzaria_x/">Insta</a> <a href="https://wa.me/5575991112222">Zap</a>');
+  });
+  try {
+    const lead = await instagram.enrich(makeLead({ name: 'Pizzaria X', website: `${base}/` }));
+    assert.equal(lead.instagram.username, 'pizzaria_x');
+    assert.equal(lead.whatsapp, '5575991112222');
+  } finally {
+    srv.close();
+  }
 });
 
-test('score: vitrine fraca pontua mais que vitrine completa', () => {
-  const weak = scoreLead({ ...makeLead({ name: 'Burger', rating: 4.0, hasLogo: false, menu: { items: 20, withPhoto: 2, withDescription: 3 } }), platforms: ['ifood'] });
-  const strong = scoreLead({ ...makeLead({ name: 'Sushi', rating: 4.9, reviewCount: 900, hasLogo: true, hasBanner: true, menu: { items: 40, withPhoto: 40, withDescription: 40 } }), platforms: ['ifood'] });
+test('telefone: só celular vira link de WhatsApp', () => {
+  assert.equal(phoneDigits('(75) 99100-0001'), '5575991000001');
+  assert.equal(whatsappNumber(makeLead({ phone: '(75) 99100-0001' })), '5575991000001');
+  assert.equal(whatsappNumber(makeLead({ phone: '(75) 3221-0002' })), null);
+});
+
+test('score: presença digital fraca pontua mais que forte', () => {
+  const now = Date.now();
+  const weak = scoreLead(makeLead({ name: 'Burger', rating: 4.0, reviewCount: 10, photoCount: 1 }), now);
+  const strong = scoreLead(
+    makeLead({
+      name: 'Sushi', website: 'https://sushi.com.br', rating: 4.9, reviewCount: 900, photoCount: 10,
+      instagram: { username: 'sushi', followers: 20000, posts: 800, lastPostAt: new Date(now).toISOString(), bio: 'Peça no wa.me/55' },
+    }),
+    now,
+  );
   assert.ok(weak.score > strong.score, `${weak.score} > ${strong.score}`);
-  assert.ok(weak.reasons.includes('Sem logo'));
+  assert.ok(weak.reasons.includes('Instagram não encontrado'));
   assert.ok(weak.score <= 100);
 });
 
-test('mescla a mesma loja vinda das duas plataformas', () => {
-  const merged = mergeAcrossPlatforms([
-    makeLead({ id: 1, source: 'ifood', name: 'Açaí Tropical', url: 'https://ifood/x' }),
-    makeLead({ id: 2, source: 'deliverymuch', name: 'Acai Tropical', phone: '75999990000', url: 'https://dm/x' }),
-  ]);
-  assert.equal(merged.length, 1);
-  assert.deepEqual(merged[0].platforms, ['ifood', 'deliverymuch']);
-  assert.equal(merged[0].phone, '75999990000');
-  assert.equal(merged[0].urls.deliverymuch, 'https://dm/x');
-});
-
-test('busca em modo demonstração devolve leads ordenados', async () => {
+test('relatório: CSV com cabeçalho e mensagens divididas no limite', async () => {
   const r = await searchLeads({ city: 'Feira de Santana', uf: 'BA', demo: true });
-  assert.ok(r.total > 0);
-  assert.deepEqual(r.errors, {});
-  for (let i = 1; i < r.leads.length; i++) assert.ok(r.leads[i - 1].score >= r.leads[i].score);
+  const csv = toCsv(r.leads);
+  assert.ok(csv.startsWith('﻿"score";"nome"'));
+  assert.equal(csv.split('\r\n').length, r.leads.length + 1);
+  const msgs = formatMessages(r, { maxLen: 600 });
+  assert.ok(msgs.length > 1);
+  assert.ok(msgs.every((m) => m.length <= 600 || !m.includes('\n\n')));
+  assert.match(msgs[0], /leads<\/b> — restaurantes em Feira de Santana\/BA/);
 });
 
-test('API /api/search valida parâmetros e responde em modo demo', async () => {
+test('Telegram: envia mensagens e a planilha', async () => {
+  const calls = [];
+  const { srv, base } = await fakeServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => (body += c));
+    req.on('end', () => {
+      calls.push({ url: req.url, body });
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ ok: true, result: {} }));
+    });
+  });
+  process.env.TELEGRAM_API_URL = base;
+  process.env.TELEGRAM_BOT_TOKEN = 'TOKEN';
+  process.env.TELEGRAM_CHAT_ID = '123';
+  delete require.cache[require.resolve('../src/telegram')];
+  const { sendLeads } = require('../src/telegram');
+  try {
+    const r = await searchLeads({ city: 'Feira de Santana', uf: 'BA', demo: true });
+    const sent = await sendLeads(r);
+    assert.equal(sent.file, true);
+    assert.ok(calls.some((c) => c.url === '/botTOKEN/sendMessage' && JSON.parse(c.body).chat_id === '123'));
+    const doc = calls.find((c) => c.url === '/botTOKEN/sendDocument');
+    assert.ok(doc && doc.body.includes('Burger do Bairro'));
+  } finally {
+    srv.close();
+    delete process.env.TELEGRAM_API_URL;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+    delete process.env.TELEGRAM_CHAT_ID;
+  }
+});
+
+test('API: valida parâmetros, busca em modo demo e informa configuração', async () => {
+  const { server } = require('../server');
   await new Promise((resolve) => server.listen(0, resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
-    const bad = await fetch(`${base}/api/search?city=X`);
-    assert.equal(bad.status, 400);
+    assert.equal((await fetch(`${base}/api/search?city=X`)).status, 400);
     const ok = await fetch(`${base}/api/search?city=Feira%20de%20Santana&uf=BA&demo=1&term=burger`);
     const data = await ok.json();
     assert.equal(ok.status, 200);
     assert.equal(data.leads[0].name, 'Burger do Bairro');
-    const page = await fetch(`${base}/`);
-    assert.match(await page.text(), /Busca de Leads/);
+    const status = await (await fetch(`${base}/api/status`)).json();
+    assert.deepEqual(Object.keys(status).sort(), ['google', 'instagram', 'telegram']);
+    assert.match(await (await fetch(`${base}/`)).text(), /Busca de Leads/);
   } finally {
     server.close();
   }

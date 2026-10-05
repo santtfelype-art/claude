@@ -20,8 +20,6 @@
       --accent: #7c5cff;
       --green: #2ecc71;
       --red: #ff4d6d;
-      --ifood: #ea1d2c;
-      --dm: #ff8a00;
       --radius: 14px;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -67,8 +65,12 @@
     .lead h3 { font-size: 1.05rem; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .meta { color: var(--muted); font-size: .85rem; margin: 2px 0 8px; }
     .badge { font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; color: #fff; text-decoration: none; }
-    .badge.ifood { background: var(--ifood); }
-    .badge.deliverymuch { background: var(--dm); }
+    .badge.maps { background: #1a73e8; }
+    .badge.ig { background: linear-gradient(90deg, #f58529, #dd2a7b, #8134af); }
+    .badge.site { background: var(--accent); }
+    .bio { font-size: .82rem; color: var(--muted); font-style: italic; margin-bottom: 8px; }
+    .notice { background: rgba(255, 179, 71, .1); border: 1px solid rgba(255, 179, 71, .4); color: #ffd9a3; padding: 10px 12px; border-radius: 10px; margin: 8px 0 16px; font-size: .88rem; }
+    .notice code { background: rgba(0,0,0,.3); padding: 1px 5px; border-radius: 4px; }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .chip { font-size: .75rem; padding: 3px 9px; border-radius: 99px; background: rgba(124, 92, 255, .15); color: #cfc3ff; }
     .side { display: grid; gap: 8px; align-content: start; }
@@ -95,21 +97,22 @@
     <header>
       <div>
         <h1>Busca de Leads <span>Vitrine Delivery</span></h1>
-        <p class="sub">Encontre lojas no iFood e na Delivery Much com vitrine fraca — os melhores leads para prospectar.</p>
+        <p class="sub">Encontra restaurantes no Google Maps, cruza com o Instagram e manda os melhores leads para o seu Telegram.</p>
       </div>
     </header>
+
+    <div id="setup"></div>
 
     <form class="search" id="form">
       <label>Cidade <input name="city" value="Feira de Santana" required /></label>
       <label>UF <input name="uf" value="BA" maxlength="2" required /></label>
-      <label class="term">Termo (opcional) <input name="term" placeholder="hambúrguer, pizza, açaí…" /></label>
+      <label class="term">O que procurar <input name="term" placeholder="hamburgueria, pizzaria, açaí…" /></label>
       <button type="submit" id="btn">Buscar leads</button>
       <div class="opts">
-        <label><input type="checkbox" name="src" value="ifood" checked /> iFood</label>
-        <label><input type="checkbox" name="src" value="deliverymuch" checked /> Delivery Much</label>
-        <label title="Lê o cardápio de cada loja para medir fotos e descrições (mais lento)"><input type="checkbox" name="enrich" checked /> Analisar cardápio</label>
+        <label title="Procura o @ de cada loja e, com token, lê seguidores e posts"><input type="checkbox" name="instagram" checked /> Buscar Instagram</label>
         <label>Score mínimo <input type="number" name="minScore" value="0" min="0" max="100" /></label>
-        <label title="Usa dados fictícios, sem acessar as plataformas"><input type="checkbox" name="demo" /> Modo demonstração</label>
+        <label title="Envia automaticamente ao terminar a busca"><input type="checkbox" name="autoSend" /> Enviar pro Telegram ao terminar</label>
+        <label title="Usa dados fictícios, sem chaves de API"><input type="checkbox" name="demo" /> Modo demonstração</label>
       </div>
     </form>
 
@@ -123,13 +126,13 @@
         <select id="statusFilter">
           <option value="">Todos os status</option>
         </select>
-        <select id="platformFilter">
-          <option value="">Todas as plataformas</option>
-          <option value="ifood">Só iFood</option>
-          <option value="deliverymuch">Só Delivery Much</option>
-          <option value="both">Nas duas</option>
+        <select id="igFilter">
+          <option value="">Com e sem Instagram</option>
+          <option value="yes">Com Instagram</option>
+          <option value="no">Sem Instagram</option>
         </select>
-        <button class="ghost" id="exportBtn" type="button">Exportar CSV</button>
+        <button id="sendBtn" type="button">Enviar pro Telegram</button>
+        <button class="ghost" id="exportBtn" type="button">Baixar CSV</button>
       </div>
       <div class="list" id="list"></div>
     </section>
@@ -137,10 +140,11 @@
 
   <script>
     const STATUSES = ['Novo', 'Contatado', 'Em negociação', 'Fechado', 'Descartado'];
-    const PLATFORM_LABEL = { ifood: 'iFood', deliverymuch: 'Delivery Much' };
     const STORE_KEY = 'vd-leads-crm';
+    const DAY = 864e5;
 
     let leads = [];
+    let lastQuery = null;
     let crm = loadCrm();
 
     function loadCrm() {
@@ -149,40 +153,43 @@
     function saveCrm() {
       try { localStorage.setItem(STORE_KEY, JSON.stringify(crm)); } catch { /* armazenamento indisponível */ }
     }
-    const keyOf = (l) => `${l.platforms.join('+')}:${l.name.toLowerCase()}`;
+    const keyOf = (l) => l.id || l.name.toLowerCase();
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
     const $ = (id) => document.getElementById(id);
     for (const s of STATUSES) $('statusFilter').insertAdjacentHTML('beforeend', `<option>${s}</option>`);
 
-    function pitch(l) {
-      const motivo = l.reasons.slice(0, 2).join(' e ').toLowerCase();
-      return `Olá, ${l.name}! Tudo bem? Sou da Vitrine Delivery, aqui de ${l.city}. ` +
-        `Dei uma olhada na loja de vocês no ${l.platforms.map((p) => PLATFORM_LABEL[p]).join(' e ')} ` +
-        (motivo ? `e vi algumas oportunidades (${motivo}). ` : '') +
-        `Ajudamos deliveries a vender mais com fotos, descrições e cardápio otimizados. Posso te mandar uma amostra gratuita?`;
-    }
-
     function phoneDigits(p) {
-      let d = String(p || '').replace(/\D/g, '');
+      let d = String(p || '').replace(/\D/g, '').replace(/^0+/, '');
       if (!d) return null;
       if (!d.startsWith('55')) d = '55' + d;
-      return d.length >= 12 ? d : null;
+      return d.length >= 12 && d.length <= 13 ? d : null;
+    }
+    function whatsapp(l) {
+      if (l.whatsapp) return l.whatsapp;
+      const d = phoneDigits(l.phone);
+      return d && d.length === 13 && d[4] === '9' ? d : null;
+    }
+    const daysSince = (iso) => (iso ? Math.floor((Date.now() - new Date(iso)) / DAY) : null);
+
+    function pitch(l) {
+      const motivo = l.reasons.filter((r) => r !== 'Nicho foco' && r !== 'Tem contato direto').slice(0, 2).join(' e ').toLowerCase();
+      return `Olá, ${l.name}! Tudo bem? Sou da Vitrine Delivery, aqui de ${lastQuery?.city || 'Feira de Santana'}. ` +
+        `Dei uma olhada no perfil de vocês no Google${l.instagram ? ' e no Instagram' : ''}` +
+        (motivo ? ` e vi algumas oportunidades (${motivo})` : '') +
+        `. Ajudamos deliveries a vender mais com fotos, cardápio e Instagram otimizados. Posso te mandar uma amostra gratuita?`;
     }
 
-    function scoreColor(s) {
-      return s >= 60 ? 'var(--green)' : s >= 35 ? 'var(--brand-2)' : 'var(--muted)';
-    }
+    const scoreColor = (s) => (s >= 60 ? 'var(--green)' : s >= 35 ? 'var(--brand-2)' : 'var(--muted)');
 
     function render() {
       const text = $('filter').value.toLowerCase();
       const st = $('statusFilter').value;
-      const pf = $('platformFilter').value;
+      const ig = $('igFilter').value;
       const shown = leads.filter((l) => {
         const c = crm[keyOf(l)] || {};
         if (st && (c.status || 'Novo') !== st) return false;
-        if (pf === 'both' && l.platforms.length < 2) return false;
-        if (pf && pf !== 'both' && !(l.platforms.length === 1 && l.platforms[0] === pf)) return false;
+        if (ig === 'yes' && !l.instagram) return false;
+        if (ig === 'no' && l.instagram) return false;
         if (text && !`${l.name} ${l.category} ${l.reasons.join(' ')}`.toLowerCase().includes(text)) return false;
         return true;
       });
@@ -190,31 +197,36 @@
       $('list').innerHTML = shown.length ? shown.map((l, i) => {
         const k = keyOf(l);
         const c = crm[k] || {};
-        const phone = phoneDigits(l.phone);
-        const badges = l.platforms.map((p) => l.urls[p]
-          ? `<a class="badge ${p}" href="${esc(l.urls[p])}" target="_blank" rel="noopener">${PLATFORM_LABEL[p]} ↗</a>`
-          : `<span class="badge ${p}">${PLATFORM_LABEL[p]}</span>`).join('');
+        const wa = whatsapp(l);
+        const badges = [
+          l.mapsUrl && `<a class="badge maps" href="${esc(l.mapsUrl)}" target="_blank" rel="noopener">Google Maps ↗</a>`,
+          l.instagram && `<a class="badge ig" href="${esc(l.instagram.url)}" target="_blank" rel="noopener">@${esc(l.instagram.username)} ↗</a>`,
+          l.website && !/instagram\.com/i.test(l.website) && `<a class="badge site" href="${esc(l.website)}" target="_blank" rel="noopener">Site ↗</a>`,
+        ].filter(Boolean).join('');
+        const d = daysSince(l.instagram?.lastPostAt);
         const meta = [
           l.category,
-          l.rating ? `★ ${l.rating.toFixed(1)}${l.reviewCount ? ` (${l.reviewCount})` : ''}` : null,
-          l.menu ? `${l.menu.withPhoto}/${l.menu.items} itens com foto` : null,
+          l.rating ? `★ ${l.rating.toFixed(1)} (${l.reviewCount ?? 0})` : 'sem nota',
+          l.photoCount != null ? `${l.photoCount} fotos` : null,
+          l.instagram?.followers != null ? `${l.instagram.followers} seguidores` : null,
+          d != null ? `último post há ${d}d` : null,
           l.phone ? `☎ ${l.phone}` : null,
           l.address,
-          l.cnpj ? `CNPJ ${l.cnpj}` : null,
         ].filter(Boolean).map(esc).join(' · ');
         return `
           <article class="lead">
             <div class="score" style="--p:${l.score};--c:${scoreColor(l.score)}" title="Score de oportunidade"><span>${l.score}</span></div>
             <div>
               <h3>${esc(l.name)} ${badges}</h3>
-              <p class="meta">${meta || '&nbsp;'}</p>
+              <p class="meta">${meta}</p>
+              ${l.instagram?.bio ? `<p class="bio">“${esc(l.instagram.bio)}”</p>` : ''}
               <div class="chips">${l.reasons.map((r) => `<span class="chip">${esc(r)}</span>`).join('')}</div>
             </div>
             <div class="side">
               <select data-k="${esc(k)}" data-f="status">${STATUSES.map((s) => `<option ${s === (c.status || 'Novo') ? 'selected' : ''}>${s}</option>`).join('')}</select>
               <textarea data-k="${esc(k)}" data-f="note" placeholder="Anotações…">${esc(c.note)}</textarea>
               <div class="actions">
-                ${phone ? `<a class="wa" target="_blank" rel="noopener" href="https://wa.me/${phone}?text=${encodeURIComponent(pitch(l))}">WhatsApp</a>` : ''}
+                ${wa ? `<a class="wa" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${encodeURIComponent(pitch(l))}">WhatsApp</a>` : ''}
                 <a class="copy" data-copy="${i}">Copiar abordagem</a>
               </div>
             </div>
@@ -236,59 +248,80 @@
       crm[k] = { ...(crm[k] || {}), [f]: e.target.value };
       saveCrm();
     });
-    ['filter', 'statusFilter', 'platformFilter'].forEach((id) => $(id).addEventListener('input', render));
+    ['filter', 'statusFilter', 'igFilter'].forEach((id) => $(id).addEventListener('input', render));
 
-    function renderStats(data) {
-      const hot = leads.filter((l) => l.score >= 60).length;
-      const both = leads.filter((l) => l.platforms.length > 1).length;
-      const withPhone = leads.filter((l) => phoneDigits(l.phone)).length;
+    function renderStats() {
       $('stats').innerHTML = [
         [leads.length, 'lojas encontradas'],
-        [hot, 'leads quentes (score ≥ 60)'],
-        [both, 'nas duas plataformas'],
-        [withPhone, 'com telefone'],
+        [leads.filter((l) => l.score >= 60).length, 'leads quentes (score ≥ 60)'],
+        [leads.filter((l) => l.instagram).length, 'com Instagram'],
+        [leads.filter((l) => whatsapp(l)).length, 'com WhatsApp'],
       ].map(([n, t]) => `<div class="stat"><b>${n}</b><small>${t}</small></div>`).join('');
     }
+
+    function showErrors(list) {
+      $('errors').innerHTML = list.map((m) => `<div class="error">${esc(m)}</div>`).join('');
+    }
+
+    async function sendToTelegram() {
+      $('sendBtn').disabled = true;
+      $('sendBtn').textContent = 'Enviando…';
+      try {
+        const res = await fetch('/api/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: lastQuery, leads }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Falha no envio');
+        $('sendBtn').textContent = 'Enviado ✓';
+      } catch (err) {
+        showErrors([err.message]);
+        $('sendBtn').textContent = 'Enviar pro Telegram';
+      } finally {
+        $('sendBtn').disabled = false;
+        setTimeout(() => ($('sendBtn').textContent = 'Enviar pro Telegram'), 2500);
+      }
+    }
+    $('sendBtn').addEventListener('click', sendToTelegram);
 
     $('form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const f = new FormData(e.target);
-      const sources = f.getAll('src');
-      if (!sources.length) { $('status').textContent = 'Escolha pelo menos uma plataforma.'; return; }
       const params = new URLSearchParams({
         city: f.get('city'), uf: f.get('uf'), term: f.get('term'),
-        sources: sources.join(','), minScore: f.get('minScore') || 0,
-        enrich: f.get('enrich') ? '1' : '0', demo: f.get('demo') ? '1' : '0',
+        minScore: f.get('minScore') || 0,
+        instagram: f.get('instagram') ? '1' : '0', demo: f.get('demo') ? '1' : '0',
       });
       $('btn').disabled = true;
-      $('status').textContent = 'Buscando lojas… (com análise de cardápio pode levar até 1 minuto)';
-      $('errors').innerHTML = '';
+      $('status').textContent = 'Buscando no Google Maps e no Instagram… (pode levar até 1 minuto)';
+      showErrors([]);
       try {
         const res = await fetch(`/api/search?${params}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Falha na busca');
         leads = data.leads;
-        $('errors').innerHTML = Object.entries(data.errors || {})
-          .map(([p, m]) => `<div class="error"><b>${PLATFORM_LABEL[p] || esc(p)}:</b> ${esc(m)}</div>`).join('');
-        $('status').textContent = `${data.total} leads em ${data.location.city}/${data.location.uf}, ordenados por oportunidade.`;
+        lastQuery = data.query;
+        $('errors').innerHTML = (data.warnings || []).map((w) => `<div class="notice">${esc(w)}</div>`).join('');
+        $('status').textContent = `${data.total} leads em ${data.query.city}/${data.query.uf}, ordenados por oportunidade.`;
         $('results').hidden = false;
-        renderStats(data);
+        renderStats();
         render();
+        if (f.get('autoSend') && leads.length) await sendToTelegram();
       } catch (err) {
         $('status').textContent = '';
-        $('errors').innerHTML = `<div class="error">${esc(err.message)}</div>`;
+        showErrors([err.message]);
       } finally {
         $('btn').disabled = false;
       }
     });
 
     $('exportBtn').addEventListener('click', () => {
-      const cols = ['score', 'nome', 'categoria', 'plataformas', 'nota', 'avaliacoes', 'itens', 'itens_com_foto', 'telefone', 'endereco', 'cnpj', 'link_ifood', 'link_deliverymuch', 'motivos', 'status', 'anotacoes'];
+      const cols = ['score', 'nome', 'categoria', 'telefone', 'whatsapp', 'endereco', 'nota_google', 'avaliacoes', 'fotos', 'site', 'google_maps', 'instagram', 'seguidores', 'posts', 'dias_sem_postar', 'motivos', 'status', 'anotacoes'];
       const rows = leads.map((l) => {
         const c = crm[keyOf(l)] || {};
-        return [l.score, l.name, l.category, l.platforms.map((p) => PLATFORM_LABEL[p]).join(' + '), l.rating, l.reviewCount,
-          l.menu?.items, l.menu?.withPhoto, l.phone, l.address, l.cnpj, l.urls.ifood, l.urls.deliverymuch,
-          l.reasons.join('; '), c.status || 'Novo', c.note];
+        return [l.score, l.name, l.category, l.phone, whatsapp(l), l.address, l.rating, l.reviewCount, l.photoCount, l.website, l.mapsUrl,
+          l.instagram?.url, l.instagram?.followers, l.instagram?.posts, daysSince(l.instagram?.lastPostAt), l.reasons.join('; '), c.status || 'Novo', c.note];
       });
       const csv = [cols, ...rows].map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
       const a = document.createElement('a');
@@ -297,6 +330,19 @@
       a.click();
       URL.revokeObjectURL(a.href);
     });
+
+    // Mostra o que ainda falta configurar no .env.
+    fetch('/api/status').then((r) => r.json()).then((s) => {
+      const missing = [
+        !s.google && '<b>GOOGLE_MAPS_API_KEY</b> (obrigatório para buscar)',
+        !s.telegram && '<b>TELEGRAM_BOT_TOKEN</b> e <b>TELEGRAM_CHAT_ID</b> (para receber os leads)',
+        !s.instagram && '<b>INSTAGRAM_USER_ID</b> e <b>INSTAGRAM_ACCESS_TOKEN</b> (opcional: seguidores e posts)',
+      ].filter(Boolean);
+      if (missing.length) {
+        $('setup').innerHTML = `<div class="notice">Falta configurar no arquivo <code>.env</code>: ${missing.join('; ')}. ` +
+          `Enquanto isso, use o <b>Modo demonstração</b>.</div>`;
+      }
+    }).catch(() => {});
   </script>
 </body>
 </html>

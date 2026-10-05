@@ -2,11 +2,12 @@
   "name": "vitrine-delivery-leads",
   "version": "1.0.0",
   "private": true,
-  "description": "Busca de leads de restaurantes no iFood e na Delivery Much para a Vitrine Delivery",
+  "description": "Busca de leads de restaurantes no Google Maps e Instagram com envio para o Telegram",
   "main": "server.js",
   "engines": { "node": ">=18" },
   "scripts": {
     "start": "node server.js",
+    "buscar": "node buscar.js",
     "test": "node --test test/*.test.js"
   }
 }
